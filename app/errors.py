@@ -48,6 +48,12 @@ class Conflict(FieldmapError):
     label = "记录冲突"
 
 
+class OrderVoided(FieldmapError):
+    status = 409
+    code = "ORDER_VOIDED"
+    label = "单据已作废"
+
+
 def install(app: FastAPI) -> None:
     @app.exception_handler(FieldmapError)
     async def _handle_domain(_: Request, exc: FieldmapError) -> JSONResponse:

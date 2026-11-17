@@ -1,6 +1,6 @@
 # 深度登记 lineageguard
 
-- 规模：中型（7 个功能模块，76 个文件，65 条测试）
+- 规模：中型（8 个功能模块，77 个文件，124 条测试）
 - 核心规则：SQL 别名源列先解析成列级边，依赖图通过环检测后再计算反向影响闭包。
 - 使用者与工作流：数仓开发在列改名或删除前，复核受影响的模型、任务与报表。
 
@@ -15,6 +15,7 @@
 | M5 影响面 | 解析列级边并查看下游影响、环、断链 | POST /api/lineage | `app/modules/m5_impact/handler.py` `app/modules/m5_impact/sql_lineage.py` `app/modules/m5_impact/closure.py` `app/modules/m5_impact/cycle.py` `app/modules/m5_impact/broken.py` | `tests/test_m5_impact.py` `tests/test_sql_lineage.py` |
 | M6 版本批次 | 跑批次、看历史、验陈旧拒绝与区间重叠 | POST /api/runs | `app/modules/m6_batches/handler.py` `app/modules/m6_batches/service.py` `app/modules/m6_batches/window.py` `app/modules/m6_batches/guard.py` `app/modules/m6_batches/history.py` | `tests/test_m6_batches.py` |
 | M7 迁移单 | 出带列级证据的单一迁移清单 | GET /api/export/evidence.csv | `app/modules/m7_migration/handler.py` `app/modules/m7_migration/service.py` `app/modules/m7_migration/csv_out.py` `app/modules/m7_migration/ledger.py` | `tests/test_m7_migration.py` |
+| M8 迁移单流转 | 按批次签发、签收、更正与补偿确认，回读冻结内容 | POST /api/runs/{run_id}/orders | `app/modules/m8_orders/handler.py` `app/modules/m8_orders/service.py` `app/modules/m8_orders/content.py` | `tests/test_m8_orders.py` |
 
 ## 陷阱登记
 
@@ -30,6 +31,7 @@
 | TRAP-22 | 同一字段被连续改过两次名 | 只认最近一跳，最早的名字解析不到 | 跨版本改名链一路解析到底 | `app/modules/m4_mapping/rename.py` | `tests/test_m4_mapping.py::test_trap22_alias_chain_resolves_multi_hop` |
 | TRAP-25 | 两个版本生效区间重叠 | 取到哪版看运气 | 半开区间比较，重叠直接标记警告 | `app/modules/m6_batches/window.py` | `tests/test_m6_batches.py::test_trap25_overlap_flagged_but_adjacent_clean` |
 | TRAP-26 | 基于旧版本号提交 | 后提交无条件覆盖新结果 | 版本号乐观锁，基线落后即 409 | `app/modules/m6_batches/guard.py` | `tests/test_m6_batches.py::test_trap26_stale_submission_rejected` |
+| TRAP-27 | 迁移单更正并发或重试 | 重复发单、旧版覆盖新版、补偿登记两次 | 修订号乐观锁 + 单事务作废发新 + 幂等键重放 | `app/modules/m8_orders/service.py` `app/store.py` | `tests/test_m8_orders.py::test_concurrent_correct_single_winner` |
 
 ## 对账规则
 
@@ -46,3 +48,4 @@
 - 类型格只覆盖数值、字符、时间、布尔四族；映射表、数组、结构体一律算 `unknown`，保守判破坏。
 - 生效区间重叠只标记不阻断，最终以版本序号为准。
 - 打印页脚用 `counter(page)`，Chrome 打印预览不渲染该计数。
+- 迁移单流转只登记签收与补偿状态，不联动下游执行系统；更正不改动原批次的分析结果。

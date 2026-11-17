@@ -55,15 +55,25 @@ docker compose up -d --build
 | GET | `/api/export/refs.csv` | 引用账 CSV |
 | GET | `/api/export/ledger.csv` | 账目 CSV |
 | GET | `/api/export/manifest.json` | 运行清单 |
+| POST | `/api/runs/{run_id}/orders` | 按批次签发迁移单，内容即时冻结 |
+| POST | `/api/orders/{order_id}/signoff` | 签收并出凭据；作废单拒收 |
+| POST | `/api/orders/{order_id}/correct` | 更正：另发新单、原单作废；已签收的登记待补偿 |
+| POST | `/api/compensations/{comp_id}/confirm` | 确认补偿，原单结清 |
+| GET | `/api/orders/{order_id}` | 按单号回读状态、签收凭据与补偿 |
+| GET | `/api/orders/{order_id}/content` | 下载冻结内容（响应头带 SHA256） |
+| GET | `/api/runs/{run_id}/orders` | 核对新旧单链、签收与补偿状态 |
+| GET | `/api/orders/pending` | 未完成处置：未签收单与待补偿 |
 
 ## 6 失败处置
 
 | 现象 | 原因 | 处置 |
 |---|---|---|
-| 409 `VERSION_STALE` | 提交带的基线序号落后 | 去掉 `base_version_seq` 或填当前序号 |
+| 409 `VERSION_STALE` | 提交带的基线序号落后，或更正带的 `expected_revision` 落后 | 去掉 `base_version_seq` 或填当前序号；更正先回读最新修订号 |
+| 409 `ORDER_VOIDED` | 签收或更正已作废、已结清的单 | 改对当前在途单操作 |
+| 409 `CONFLICT` | 重复签发、幂等键串用或更正撞车 | 按返回的单号回读，勿换键重发 |
 | 400 `WINDOW_INVERTED` | 生效区间起点不早于终点 | 检查 `effective_from` / `effective_to` |
 | 400 `BAD_INPUT` | 文件名、参数或 JSON 结构不对 | 看返回的 `detail` |
-| 404 `NOT_FOUND` | 还没跑过批次 | 先在 `/batches` 点「跑一次」 |
+| 404 `NOT_FOUND` | 还没跑过批次，或单号、补偿号不存在 | 先在 `/batches` 点「跑一次」，再核对单号 |
 
 ## 7 端口与并发
 
